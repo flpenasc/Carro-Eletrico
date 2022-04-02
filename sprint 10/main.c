@@ -12,7 +12,6 @@
 
 #define ENDERECO_HODOMETRO 0
 #define ENDERECO_DIAMETRO_PNEU 4
-#define ENDERECO_FORCA_MAXIMA 5
 #define ENDERECO_TEMPERATURA_MAX 6
 
 //Aluno: Felipe Augusto Silva Nascimento
@@ -45,7 +44,7 @@ ISR(TIMER2_COMPA_vect);
 ISR(INT0_vect);
 ISR(PCINT2_vect);
 ISR(USART_RX_vect);
-void leitura_sensores_ADC(uint8_t *flag_disparo, uint16_t *temperatura_pont, uint16_t *bateria_pont, uint16_t *temp_max_pont, uint16_t *forca_pont,  uint16_t *forca_max_pont);
+void leitura_sensores_ADC(uint8_t *flag_disparo, uint16_t *temperatura_pont, uint16_t *bateria_pont, uint16_t *temp_max_pont, uint16_t *forca_pont);
 void USART_Init(unsigned int ubrr);
 void USART_Transmit(unsigned char data);
 unsigned char USART_Receive(void);
@@ -95,7 +94,6 @@ int main(void)
 
 	dist_km = eeprom_read_dword(ENDERECO_HODOMETRO); //Lê o valor do hodometro armazenado no EEPROM (posições de 0 à 3)
 	diametro_pneu = eeprom_read_byte(ENDERECO_DIAMETRO_PNEU); //Lê o valor do diametro do pneu armazenado no EEPROM (posição 4)
-	forca_max = eeprom_read_byte(ENDERECO_FORCA_MAXIMA); //Lê o valor da força máxima armazenada na EEPROM (posição 5)
 	temperatura_max = eeprom_read_byte(ENDERECO_TEMPERATURA_MAX); //Lê o valor da temperatura máxima da bateria armazenada na EEPROM (posição 6)
 	
 	dist_anterior = dist_km * 100000;
@@ -109,7 +107,7 @@ int main(void)
 	while (1)
 	{
 		
-		leitura_sensores_ADC(&flag_150ms, &temperatura, &bateria, &temperatura_max, &forca, &forca_max); //Chama a função que lê os valores ADC
+		leitura_sensores_ADC(&flag_150ms, &temperatura, &bateria, &temperatura_max, &forca); //Chama a função que lê os valores ADC
 		airbag (&distancia_sonar_cm, &vel_carro, &forca);
 		
 		GLCD_Clear();
@@ -231,7 +229,7 @@ ISR(TIMER0_COMPA_vect)
 	tempo_ms++;
 	TEMPO_100us++;
 	
-	if ((tempo_ms % 100) == 0)  //True a cada 150ms
+	if ((tempo_ms % 150) == 0)  //True a cada 150ms
 	{
 		flag_150ms = 1;
 	}
@@ -285,7 +283,7 @@ ISR(PCINT2_vect)//Função para incrementar ou decrementar o diâmetro do pneu
 	}
 }
 //Função que realiza a leitura dos sensores ADC: acelerador, bateria e temperatura
-void leitura_sensores_ADC(uint8_t *flag_disparo, uint16_t *temperatura_pont, uint16_t *bateria_pont, uint16_t *temp_max_pont, uint16_t *forca_pont, uint16_t *forca_max_pont)
+void leitura_sensores_ADC(uint8_t *flag_disparo, uint16_t *temperatura_pont, uint16_t *bateria_pont, uint16_t *temp_max_pont, uint16_t *forca_pont)
 {
 
 	static uint8_t cont_canal = 0; //Contador do número de canal
@@ -328,15 +326,6 @@ void leitura_sensores_ADC(uint8_t *flag_disparo, uint16_t *temperatura_pont, uin
 			// Vf = ((5/1023)*ADC) e forca = 1000*(Vf-2.66/0.86)
 			*forca_pont = ((float)1000*(((((float)5/1023)*ADC)-(float)2.66)/0.86))/10;
 			cont_canal = -1;
-			
-			if(cont_forca == 0){
-				*forca_max_pont = *forca_pont; //Força inicial é igual a força máxima
-				cont_forca++;
-			}
-			else if (*forca_pont > *forca_max_pont){ //Se a força for maior que a força máxima, então
-				*forca_max_pont = *forca_pont; //a váriável força máxima assume os valores da variável força
-			}
-			eeprom_write_byte(ENDERECO_FORCA_MAXIMA, *forca_max_pont); //Escreve o valor da força máxima na posição 5 da EEPROM
 			break;
 		}
 		cont_canal++;
@@ -373,13 +362,6 @@ ISR(USART_RX_vect)
 	}
 	if(char_recebido == 'l'){ //Verifica se o usuário enviou o caractere "l" no monitor serial
 		temperatura_max = 0; //Zera o valor da temperatura máxima que está armazenada na EEPROM
-	}
-	
-	if(char_recebido =='f'){ //Verifica se o usuário enviou o caractere "f" no monitor serial
-		USART_Transmit(forca_max); //Transmite a força máxima armazenada na EEPROM
-	}
-	if(char_recebido == 'c'){ //Verifica se o usuário enviou o caractere "c" no monitor serial
-		forca_max = 0; //Zera o valor da força máxima que está armazenada na EEPROM
 	}
 }
 
